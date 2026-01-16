@@ -497,6 +497,101 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Windows 11 style title bar */
+.windows-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  background-color: var(--background-standard, #1a1a1a);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.windows-titlebar-drag {
+  -webkit-app-region: drag;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: 12px;
+}
+
+.windows-titlebar-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-default, #e0e0e0);
+  user-select: none;
+}
+
+.windows-titlebar-controls {
+  -webkit-app-region: no-drag;
+  display: flex;
+  height: 100%;
+}
+
+.windows-titlebar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-default, #e0e0e0);
+  transition: background-color 0.1s ease;
+}
+
+.windows-titlebar-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.windows-titlebar-button:active {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.windows-titlebar-close:hover {
+  background-color: #c42b1c;
+  color: white;
+}
+
+.windows-titlebar-close:active {
+  background-color: #b52a1c;
+  color: white;
+}
+
+/* Light theme support */
+[data-theme="light"] .windows-titlebar,
+.light .windows-titlebar {
+  background-color: var(--background-standard, #f3f3f3);
+}
+
+[data-theme="light"] .windows-titlebar-title,
+.light .windows-titlebar-title {
+  color: var(--text-default, #1a1a1a);
+}
+
+[data-theme="light"] .windows-titlebar-button,
+.light .windows-titlebar-button {
+  color: var(--text-default, #1a1a1a);
+}
+
+[data-theme="light"] .windows-titlebar-button:hover,
+.light .windows-titlebar-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .windows-titlebar-close:hover,
+.light .windows-titlebar-close:hover {
+  background-color: #c42b1c;
+  color: white;
+}
+
 .bg-inline-code {
   border-radius: 4px;
   color: var(--color-neutral-200);

@@ -133,6 +133,11 @@ type ElectronAPI = {
   isUsingGitHubFallback: () => Promise<boolean>;
   // Recipe warning functions
   closeWindow: () => void;
+  // Window control functions for custom title bar
+  minimizeWindow: () => void;
+  maximizeWindow: () => void;
+  isWindowMaximized: () => Promise<boolean>;
+  onWindowMaximizedChange: (callback: (isMaximized: boolean) => void) => void;
   hasAcceptedRecipeBefore: (recipe: Recipe) => Promise<boolean>;
   recordRecipeHash: (recipe: Recipe) => Promise<boolean>;
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
@@ -270,6 +275,13 @@ const electronAPI: ElectronAPI = {
     return ipcRenderer.invoke('is-using-github-fallback');
   },
   closeWindow: () => ipcRenderer.send('close-window'),
+  // Window control functions for custom title bar
+  minimizeWindow: () => ipcRenderer.send('minimize-window'),
+  maximizeWindow: () => ipcRenderer.send('maximize-window'),
+  isWindowMaximized: () => ipcRenderer.invoke('is-window-maximized'),
+  onWindowMaximizedChange: (callback: (isMaximized: boolean) => void) => {
+    ipcRenderer.on('window-maximized-change', (_event, isMaximized) => callback(isMaximized));
+  },
   hasAcceptedRecipeBefore: (recipe: Recipe) =>
     ipcRenderer.invoke('has-accepted-recipe-before', recipe),
   recordRecipeHash: (recipe: Recipe) => ipcRenderer.invoke('record-recipe-hash', recipe),

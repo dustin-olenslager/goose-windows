@@ -554,10 +554,10 @@ const createChat = async (
   });
 
   const mainWindow = new BrowserWindow({
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 20, y: 16 } : undefined,
     vibrancy: process.platform === 'darwin' ? 'window' : undefined,
-    frame: process.platform !== 'darwin',
+    frame: false, // Use custom title bar on all platforms
     x: mainWindowState.x,
     y: mainWindowState.y,
     width: mainWindowState.width,
@@ -808,6 +808,15 @@ const createChat = async (
       mainWindow.webContents.send('mouse-back-button-clicked');
       e.preventDefault();
     }
+  });
+
+  // Emit maximize state changes for custom Windows title bar
+  mainWindow.on('maximize', () => {
+    mainWindow.webContents.send('window-maximized-change', true);
+  });
+
+  mainWindow.on('unmaximize', () => {
+    mainWindow.webContents.send('window-maximized-change', false);
   });
 
   // Handle mouse back button (button 3)
@@ -2258,6 +2267,33 @@ async function appMain() {
     if (window && !window.isDestroyed()) {
       window.close();
     }
+  });
+
+  // Window control handlers for custom Windows title bar
+  ipcMain.on('minimize-window', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window && !window.isDestroyed()) {
+      window.minimize();
+    }
+  });
+
+  ipcMain.on('maximize-window', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window && !window.isDestroyed()) {
+      if (window.isMaximized()) {
+        window.unmaximize();
+      } else {
+        window.maximize();
+      }
+    }
+  });
+
+  ipcMain.handle('is-window-maximized', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window && !window.isDestroyed()) {
+      return window.isMaximized();
+    }
+    return false;
   });
 
   ipcMain.on('notify', (event, data) => {

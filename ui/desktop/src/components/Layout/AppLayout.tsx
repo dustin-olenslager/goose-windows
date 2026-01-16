@@ -10,11 +10,16 @@ import { getInitialWorkingDir } from '../../utils/workingDir';
 const AppLayoutContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+  const platform = window?.electron?.platform || 'darwin';
+  const safeIsMacOS = platform === 'darwin';
+  const isWindows = platform === 'win32';
   const { isMobile, openMobile } = useSidebar();
 
-  // Calculate padding based on sidebar state and macOS
+  // Calculate padding based on sidebar state and platform
+  // macOS: extra left padding for traffic lights
+  // Windows: extra top padding for custom title bar
   const headerPadding = safeIsMacOS ? 'pl-21' : 'pl-4';
+  const topPadding = isWindows ? 'mt-[32px]' : '';
   // const headerPadding = '';
 
   // Hide buttons when mobile sheet is showing
@@ -71,7 +76,7 @@ const AppLayoutContent: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-1 w-full relative animate-fade-in">
+    <div className={`flex flex-1 w-full relative animate-fade-in ${topPadding}`}>
       {!shouldHideButtons && (
         <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
           <SidebarTrigger

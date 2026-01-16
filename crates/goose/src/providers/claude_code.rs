@@ -269,7 +269,54 @@ impl ClaudeCodeProvider {
             println!("================================");
         }
 
+        // On Windows, .cmd/.bat files for npm packages don't work well with subprocess spawning.
+        // Instead, we run node.exe directly with the underlying CLI JavaScript file.
+        #[cfg(windows)]
+        let mut cmd = {
+            let ext = self.command.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext.eq_ignore_ascii_case("cmd") {
+                // For .cmd files (npm packages), find and run the JS file directly with node
+                // The .cmd file is typically at: %APPDATA%\npm\<name>.cmd
+                // The JS file is at: %APPDATA%\npm\node_modules\@anthropic-ai\claude-code\cli.js
+                let cmd_dir = self.command.parent();
+                let js_path = cmd_dir.map(|dir| {
+                    dir.join("node_modules")
+                        .join("@anthropic-ai")
+                        .join("claude-code")
+                        .join("cli.js")
+                });
+
+                // Find node.exe
+                let node_paths = [
+                    r"C:\Program Files\nodejs\node.exe",
+                    r"C:\Program Files (x86)\nodejs\node.exe",
+                ];
+
+                let node_exe = node_paths
+                    .iter()
+                    .find(|p| std::path::Path::new(p).exists())
+                    .map(|s| *s);
+
+                if let (Some(node), Some(js)) = (node_exe, js_path) {
+                    if js.exists() {
+                        let mut c = Command::new(node);
+                        c.arg(&js);
+                        c
+                    } else {
+                        // Fallback to direct command if JS file not found
+                        Command::new(&self.command)
+                    }
+                } else {
+                    // Fallback to direct command if node not found
+                    Command::new(&self.command)
+                }
+            } else {
+                Command::new(&self.command)
+            }
+        };
+        #[cfg(not(windows))]
         let mut cmd = Command::new(&self.command);
+
         configure_command_no_window(&mut cmd);
         cmd.arg("-p")
             .arg(messages_json.to_string())
@@ -323,14 +370,36 @@ impl ClaudeCodeProvider {
             }
         }
 
+        // Capture stderr for error reporting
+        let stderr = child.stderr.take();
+
         let exit_status = child.wait().await.map_err(|e| {
             ProviderError::RequestFailed(format!("Failed to wait for command: {}", e))
         })?;
 
         if !exit_status.success() {
+            // Read stderr to get the actual error message
+            let stderr_output = if let Some(stderr) = stderr {
+                let mut stderr_reader = BufReader::new(stderr);
+                let mut stderr_content = String::new();
+                let _ = stderr_reader.read_line(&mut stderr_content).await;
+                stderr_content.trim().to_string()
+            } else {
+                String::new()
+            };
+
+            // Also include any stdout we captured (might have error info)
+            let stdout_preview = if lines.is_empty() {
+                String::new()
+            } else {
+                lines.iter().take(5).cloned().collect::<Vec<_>>().join("\n")
+            };
+
             return Err(ProviderError::RequestFailed(format!(
-                "Command failed with exit code: {:?}",
-                exit_status.code()
+                "Command failed with exit code: {:?}. Stderr: {}. Stdout preview: {}",
+                exit_status.code(),
+                if stderr_output.is_empty() { "(empty)" } else { &stderr_output },
+                if stdout_preview.is_empty() { "(empty)" } else { &stdout_preview }
             )));
         }
 

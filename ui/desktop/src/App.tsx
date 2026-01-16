@@ -45,6 +45,7 @@ import { errorMessage } from './utils/conversionUtils';
 import { getInitialWorkingDir } from './utils/workingDir';
 import { usePageViewTracking } from './hooks/useAnalytics';
 import { trackOnboardingCompleted, trackErrorWithContext } from './utils/analytics';
+import WindowsTitleBar from './components/Layout/WindowsTitleBar';
 
 function PageViewTracker() {
   usePageViewTracking();
@@ -575,7 +576,10 @@ export function AppInner() {
       />
       <ExtensionInstallModal addExtension={addExtension} setView={setView} />
       <div className="relative w-screen h-screen overflow-hidden bg-background-muted flex flex-col">
-        <div className="titlebar-drag-region" />
+        {/* Windows custom title bar - only show on Windows */}
+        {window.electron?.platform === 'win32' && <WindowsTitleBar />}
+        {/* macOS drag region - only show on macOS */}
+        {window.electron?.platform === 'darwin' && <div className="titlebar-drag-region" />}
         <Routes>
           <Route path="launcher" element={<LauncherView />} />
           <Route
