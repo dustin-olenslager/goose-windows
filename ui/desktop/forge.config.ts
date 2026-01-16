@@ -81,7 +81,8 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin', 'win32', 'linux'],
+      // Temporarily exclude win32 due to cross-zip bug with Node.js 25
+      platforms: ['darwin', 'linux'],
       config: {
         arch: process.env.ELECTRON_ARCH === 'x64' ? ['x64'] : ['arm64'],
         options: {
