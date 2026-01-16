@@ -4,26 +4,38 @@ This is a Windows-optimized fork of [Block's Goose](https://github.com/block/goo
 
 ## Features
 
+- **Native Windows 11 Title Bar**: Proper minimize, maximize, and close controls
+- **One-Click Auto-Updates**: Seamless updates via Settings → App → Check for Updates
 - **Native MSVC Builds**: Uses Microsoft Visual C++ toolchain for optimal Windows performance
 - **Windows Installer**: Squirrel-based installer with automatic updates
-- **System Integration**: Proper Windows registry, Start Menu, and protocol handler support
-- **Automatic Sync**: Stays up-to-date with upstream block/goose via automated workflows
+- **Claude CLI Provider Fix**: Works correctly with Windows subprocess handling
+- **Automatic Sync**: Stays up-to-date with upstream block/goose every 4 hours
 - **PowerShell Scripts**: Easy-to-use build and development scripts
 
 ## Quick Start
 
 ### Download
 
-Download the latest release from the [Releases page](https://github.com/dustin-olenslager/goose-windows/releases).
+**[Download Latest Release](https://github.com/dustin-olenslager/goose-windows/releases/latest)**
 
-- **GooseSetup.exe** - Windows installer (recommended)
-- **Goose-win32-x64.zip** - Portable version
+- **Goose-X.X.X.Setup.exe** - Windows installer with auto-updates (recommended)
+- **Goose-win32-x64-X.X.X.zip** - Portable version
 
 ### Install
 
-1. Download `GooseSetup.exe`
+1. Download `Goose-X.X.X.Setup.exe` from the latest release
 2. Run the installer
-3. Launch Goose from the Start Menu
+3. Goose installs to `%LOCALAPPDATA%\Goose`
+4. Launch from Start Menu
+
+### Updating
+
+The app automatically checks for updates. To manually update:
+
+1. Open Goose
+2. Go to **Settings** (sidebar) → **App** tab
+3. Click **Check for Updates**
+4. Click **Install & Restart** when available
 
 ## Building from Source
 
@@ -131,7 +143,7 @@ goose-windows/
 
 This fork automatically syncs with the upstream [block/goose](https://github.com/block/goose) repository:
 
-- **Daily sync**: Runs every day at 6 AM UTC
+- **Automatic sync**: Runs every 4 hours
 - **Automatic PRs**: Creates PRs when conflicts need manual resolution
 - **Manual sync**: Trigger via Actions → Sync Upstream → Run workflow
 
