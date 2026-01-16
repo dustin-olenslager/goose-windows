@@ -27,8 +27,10 @@ interface UpdateCheckResult {
 }
 
 export class GitHubUpdater {
-  private readonly owner = 'block';
-  private readonly repo = 'goose';
+  // For Windows fork, point to the fork's releases
+  // Change these if you want to use your own fork's releases
+  private readonly owner = process.platform === 'win32' ? 'dustin-olenslager' : 'block';
+  private readonly repo = process.platform === 'win32' ? 'goose-windows' : 'goose';
   private readonly apiUrl = `https://api.github.com/repos/${this.owner}/${this.repo}/releases/latest`;
 
   async checkForUpdates(): Promise<UpdateCheckResult> {

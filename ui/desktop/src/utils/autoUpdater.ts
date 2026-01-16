@@ -354,10 +354,11 @@ export function setupAutoUpdater(tray?: Tray) {
   log.info(`Resources path: ${process.resourcesPath}`);
 
   // Set the feed URL for GitHub releases
+  // On Windows, use the Windows fork; otherwise use the main repo
   const feedConfig = {
     provider: 'github' as const,
-    owner: 'block',
-    repo: 'goose',
+    owner: process.platform === 'win32' ? 'dustin-olenslager' : 'block',
+    repo: process.platform === 'win32' ? 'goose-windows' : 'goose',
     releaseType: 'release' as const,
   };
 

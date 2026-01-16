@@ -1,0 +1,158 @@
+# Windows Release Workflow
+# Builds and publishes Windows releases when a version tag is pushed
+
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.20.1)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            crates -> target
+
+      - name: Install dependencies
+        run: |
+          npm install -g npm@latest
+          cd ui/desktop
+          npm ci
+
+      - name: Build Rust binaries
+        run: |
+          cargo build --release
+
+      - name: Build Electron app
+        working-directory: ui/desktop
+        run: |
+          npm run bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Windows app
+        working-directory: ui/desktop
+        run: |
+          npm run package:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $outDir = "ui/desktop/out"
+
+          # Find the built app directory
+          $appDir = Get-ChildItem -Path $outDir -Directory | Where-Object { $_.Name -like "*win*" } | Select-Object -First 1
+
+          if ($appDir) {
+            $zipName = "Goose-win32-x64-$version.zip"
+            Compress-Archive -Path "$($appDir.FullName)/*" -DestinationPath "$outDir/$zipName"
+            Write-Host "Created $zipName"
+          } else {
+            Write-Error "Could not find built Windows app"
+            exit 1
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: goose-windows-${{ steps.version.outputs.version }}
+          path: |
+            ui/desktop/out/*.zip
+            ui/desktop/out/*.exe
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: goose-windows-*
+          merge-multiple: true
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version && format('v{0}', github.event.inputs.version) || github.ref_name }}
+          name: Goose Windows ${{ steps.version.outputs.version }}
+          body: |
+            ## Goose Windows ${{ steps.version.outputs.version }}
+
+            Windows-optimized build of [Goose](https://github.com/block/goose).
+
+            ### Installation
+
+            1. Download `Goose-win32-x64-${{ steps.version.outputs.version }}.zip`
+            2. Extract to a folder of your choice
+            3. Run `Goose.exe`
+
+            ### Changes
+
+            See the [upstream changelog](https://github.com/block/goose/releases) for full details.
+
+            This release includes Windows-specific enhancements:
+            - Native Windows 11 title bar
+            - Windows build optimizations
+            - Claude CLI provider fixes for Windows
+          files: |
+            *.zip
+            *.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
