@@ -72,3 +72,14 @@ result
 
 # Goose self-test artifacts
 gooseselftest/
+
+# Windows build artifacts
+*.exe
+!ui/desktop/src/platform/windows/bin/*.exe
+*.dll
+!ui/desktop/src/platform/windows/bin/*.dll
+*.msi
+*.nupkg
+
+# Windows temp files
+tmpclaude-*

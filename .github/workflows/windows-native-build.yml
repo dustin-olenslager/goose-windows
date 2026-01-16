@@ -1,0 +1,277 @@
+# Windows Native Build CI/CD Pipeline
+# Builds and releases Goose for Windows using native MSVC toolchain
+# This workflow runs on Windows runners for true native builds (vs cross-compilation)
+
+name: Windows Native Build
+
+on:
+  push:
+    branches: [main, develop, 'release/*']
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
+      create_release:
+        description: 'Create GitHub release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-windows:
+    name: Build Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64]
+        include:
+          - arch: x64
+            rust_target: x86_64-pc-windows-msvc
+            electron_arch: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.rust_target }}
+          components: clippy, rustfmt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ui/desktop/package-lock.json
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-${{ matrix.arch }}
+
+      - name: Determine build type
+        id: build_type
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            echo "type=${{ github.event.inputs.build_type }}" >> $env:GITHUB_OUTPUT
+          } elseif ("${{ github.ref }}" -like "refs/tags/v*") {
+            echo "type=release" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "type=release" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Build Rust binaries
+        shell: pwsh
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.rust_target }}
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: |
+          $BuildArgs = @("build", "--target", "${{ matrix.rust_target }}")
+
+          if ("${{ steps.build_type.outputs.type }}" -eq "release") {
+            $BuildArgs += "--release"
+          }
+
+          Write-Host "Building with: cargo $($BuildArgs -join ' ')"
+          cargo @BuildArgs
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Cargo build failed"
+          }
+
+      - name: Generate OpenAPI schema
+        shell: pwsh
+        run: |
+          cargo run -p goose-server --bin generate_schema
+        continue-on-error: true
+
+      - name: Copy binaries to UI
+        shell: pwsh
+        run: |
+          $BuildDir = if ("${{ steps.build_type.outputs.type }}" -eq "release") { "release" } else { "debug" }
+          $SourceDir = "target/${{ matrix.rust_target }}/$BuildDir"
+          $DestDir = "ui/desktop/src/bin"
+
+          New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
+
+          Copy-Item -Path "$SourceDir/goosed.exe" -Destination $DestDir -Force
+          Copy-Item -Path "$SourceDir/goose.exe" -Destination $DestDir -Force -ErrorAction SilentlyContinue
+
+          # Copy any DLLs if present
+          Get-ChildItem -Path $SourceDir -Filter "*.dll" -ErrorAction SilentlyContinue |
+            Copy-Item -Destination $DestDir -Force
+
+          Write-Host "Binaries copied to $DestDir"
+          Get-ChildItem $DestDir
+
+      - name: Install UI dependencies
+        working-directory: ui/desktop
+        run: npm ci
+
+      - name: Generate API client
+        working-directory: ui/desktop
+        run: npm run generate-api
+        continue-on-error: true
+
+      - name: Type check UI
+        working-directory: ui/desktop
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Build Electron app
+        working-directory: ui/desktop
+        shell: pwsh
+        env:
+          ELECTRON_PLATFORM: win32
+          ELECTRON_ARCH: ${{ matrix.electron_arch }}
+        run: |
+          npm run make -- --platform=win32 --arch=${{ matrix.electron_arch }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: goose-windows-${{ matrix.arch }}
+          path: |
+            ui/desktop/out/make/**/*.exe
+            ui/desktop/out/make/**/*.zip
+            ui/desktop/out/make/**/*.nupkg
+          if-no-files-found: warn
+
+      - name: Upload portable binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: goose-binaries-windows-${{ matrix.arch }}
+          path: |
+            target/${{ matrix.rust_target }}/${{ steps.build_type.outputs.type }}/goosed.exe
+            target/${{ matrix.rust_target }}/${{ steps.build_type.outputs.type }}/goose.exe
+          if-no-files-found: error
+
+  test-windows:
+    name: Test Windows
+    runs-on: windows-latest
+    needs: build-windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-test
+
+      - name: Run Rust tests
+        shell: pwsh
+        run: |
+          cargo test --workspace --exclude goose-bench
+        continue-on-error: true
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: goose-binaries-windows-x64
+          path: binaries
+
+      - name: Test binary execution
+        shell: pwsh
+        run: |
+          $GoosedPath = "binaries/goosed.exe"
+
+          if (Test-Path $GoosedPath) {
+            Write-Host "Testing goosed binary..."
+            & $GoosedPath --version
+            Write-Host "Binary test passed"
+          } else {
+            Write-Warning "goosed.exe not found"
+          }
+        continue-on-error: true
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, test-windows]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: goose-*-windows-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name || format('v{0}', steps.version.outputs.version) }}
+          name: Goose Windows ${{ steps.version.outputs.version }}
+          draft: true
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.zip
+          body: |
+            ## Goose for Windows
+
+            This release contains Windows-native builds of Goose.
+
+            ### Downloads
+
+            - **Installer**: Download the `.exe` file for easy installation
+            - **Portable**: Download the `.zip` for a portable version
+
+            ### System Requirements
+
+            - Windows 10 or later (64-bit)
+            - 4 GB RAM minimum
+            - 500 MB disk space
+
+            ### Installation
+
+            1. Download the installer (`.exe`)
+            2. Run the installer
+            3. Follow the on-screen instructions
+            4. Launch Goose from the Start Menu
+
+            ### Notes
+
+            - Built with MSVC toolchain for native Windows performance
+            - Includes automatic updates

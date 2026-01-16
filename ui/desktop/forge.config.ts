@@ -2,6 +2,11 @@ const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const { resolve } = require('path');
 
+// Determine the GitHub repository for releases
+// For forks, change this to your fork's owner/name
+const GITHUB_OWNER = process.env.GITHUB_REPOSITORY_OWNER || 'dustin-olenslager';
+const GITHUB_REPO = process.env.GITHUB_REPOSITORY_NAME || 'goose-windows';
+
 let cfg = {
   asar: true,
   extraResource: ['src/bin', 'src/images'],
@@ -13,6 +18,10 @@ let cfg = {
     signingRole: process.env.WINDOW_SIGNING_ROLE,
     rfc3161TimeStampServer: 'http://timestamp.digicert.com',
     signWithParams: '/fd sha256 /tr http://timestamp.digicert.com /td sha256',
+    // Windows-specific metadata
+    companyName: 'Goose Windows',
+    fileDescription: 'Goose - AI Agent for Developers',
+    productName: 'Goose',
   },
   // Protocol registration
   protocols: [
@@ -43,8 +52,8 @@ module.exports = {
       name: '@electron-forge/publisher-github',
       config: {
         repository: {
-          owner: 'block',
-          name: 'goose',
+          owner: GITHUB_OWNER,
+          name: GITHUB_REPO,
         },
         prerelease: false,
         draft: true,
@@ -52,6 +61,25 @@ module.exports = {
     },
   ],
   makers: [
+    // Windows Squirrel installer (recommended for Windows)
+    {
+      name: '@electron-forge/maker-squirrel',
+      platforms: ['win32'],
+      config: {
+        name: 'Goose',
+        authors: 'Goose Windows',
+        description: 'Goose - AI Agent for Developers',
+        iconUrl: 'https://raw.githubusercontent.com/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/main/ui/desktop/src/images/icon.ico',
+        setupIcon: 'src/images/icon.ico',
+        loadingGif: 'src/images/installing.gif',
+        // Certificate settings (optional - for code signing)
+        certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
+        certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
+        // Squirrel options
+        noMsi: false,  // Also create MSI installer
+        remoteReleases: 'https://github.com/' + GITHUB_OWNER + '/' + GITHUB_REPO,
+      },
+    },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin', 'win32', 'linux'],
