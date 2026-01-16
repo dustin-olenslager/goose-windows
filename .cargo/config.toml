@@ -1,41 +1,11 @@
-# Cargo configuration for Windows-optimized builds
-# This file configures the Rust build for native Windows with MSVC
-
-[build]
-# Use all available CPU cores for parallel compilation
-jobs = 0
-
-[target.x86_64-pc-windows-msvc]
-# Native Windows MSVC target (recommended for Windows)
-rustflags = [
-    # Link the C runtime statically for standalone executables
-    "-C", "target-feature=+crt-static",
-    # Optimize for modern CPUs
-    "-C", "target-cpu=native",
-]
-
-# Windows-specific linker settings
-linker = "link.exe"
-
-[target.x86_64-pc-windows-gnu]
-# MinGW target (fallback when MSVC is not available)
-rustflags = [
-    "-C", "link-arg=-Wl,--allow-multiple-definition",
-]
-
-[target.aarch64-pc-windows-msvc]
-# ARM64 Windows support (for future ARM Windows devices)
-rustflags = [
-    "-C", "target-feature=+crt-static",
-]
+# Cargo configuration for Windows builds
+# Using GNU toolchain (no Visual Studio required)
 
 [profile.release]
 # Optimize for size and speed in release builds
 opt-level = 3
 lto = "thin"
 codegen-units = 1
-panic = "abort"
-strip = true
 
 [profile.release.package."*"]
 # Optimize all dependencies
@@ -49,12 +19,6 @@ opt-level = 0
 [profile.dev.package."*"]
 # Optimize dependencies even in dev builds
 opt-level = 2
-
-[alias]
-# Helpful build aliases
-win-build = "build --target x86_64-pc-windows-msvc --release"
-win-debug = "build --target x86_64-pc-windows-msvc"
-win-test = "test --target x86_64-pc-windows-msvc"
 
 [env]
 # Environment variables for Windows builds
