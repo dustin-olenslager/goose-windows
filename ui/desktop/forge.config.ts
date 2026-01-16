@@ -71,7 +71,6 @@ module.exports = {
         description: 'Goose - AI Agent for Developers',
         iconUrl: 'https://raw.githubusercontent.com/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/main/ui/desktop/src/images/icon.ico',
         setupIcon: 'src/images/icon.ico',
-        loadingGif: 'src/images/installing.gif',
         // Certificate settings (optional - for code signing)
         certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
         certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,

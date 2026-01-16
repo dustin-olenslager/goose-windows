@@ -1,5 +1,5 @@
 # Windows Release Workflow
-# Builds and publishes Windows releases when a version tag is pushed
+# Builds and publishes Windows releases with Squirrel installer for auto-updates
 
 name: Release Windows
 
@@ -16,6 +16,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  GITHUB_REPOSITORY_OWNER: dustin-olenslager
+  GITHUB_REPOSITORY_NAME: goose-windows
 
 jobs:
   build-windows:
@@ -43,28 +45,25 @@ jobs:
             crates -> target
 
       - name: Install dependencies
-        run: |
-          npm install -g npm@latest
-          cd ui/desktop
-          npm ci
+        working-directory: ui/desktop
+        run: npm ci
 
       - name: Build Rust binaries
-        run: |
-          cargo build --release
+        run: cargo build --release
 
-      - name: Build Electron app
+      - name: Prepare platform binaries
         working-directory: ui/desktop
-        run: |
-          npm run bundle
+        run: node scripts/prepare-platform-binaries.js
+        env:
+          ELECTRON_PLATFORM: win32
+
+      - name: Build and make Windows installer
+        working-directory: ui/desktop
+        run: npm run make -- --platform=win32 --arch=x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Package Windows app
-        working-directory: ui/desktop
-        run: |
-          npm run package:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY_OWNER: ${{ env.GITHUB_REPOSITORY_OWNER }}
+          GITHUB_REPOSITORY_NAME: ${{ env.GITHUB_REPOSITORY_NAME }}
 
       - name: Get version
         id: version
@@ -76,31 +75,28 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create release archive
+      - name: List build outputs
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $outDir = "ui/desktop/out"
-
-          # Find the built app directory
-          $appDir = Get-ChildItem -Path $outDir -Directory | Where-Object { $_.Name -like "*win*" } | Select-Object -First 1
-
-          if ($appDir) {
-            $zipName = "Goose-win32-x64-$version.zip"
-            Compress-Archive -Path "$($appDir.FullName)/*" -DestinationPath "$outDir/$zipName"
-            Write-Host "Created $zipName"
-          } else {
-            Write-Error "Could not find built Windows app"
-            exit 1
+          Write-Host "=== Build outputs ==="
+          Get-ChildItem -Path ui/desktop/out -Recurse -File | ForEach-Object {
+            Write-Host "$($_.FullName) - $($_.Length) bytes"
           }
 
-      - name: Upload artifacts
+      - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: goose-windows-${{ steps.version.outputs.version }}
+          name: goose-windows-squirrel-${{ steps.version.outputs.version }}
           path: |
-            ui/desktop/out/*.zip
-            ui/desktop/out/*.exe
+            ui/desktop/out/make/squirrel.windows/x64/*.exe
+            ui/desktop/out/make/squirrel.windows/x64/*.nupkg
+            ui/desktop/out/make/squirrel.windows/x64/RELEASES
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goose-windows-zip-${{ steps.version.outputs.version }}
+          path: ui/desktop/out/make/zip/win32/x64/*.zip
 
   create-release:
     name: Create GitHub Release
@@ -110,11 +106,19 @@ jobs:
       contents: write
 
     steps:
-      - name: Download artifacts
+      - name: Download Squirrel artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: goose-windows-*
-          merge-multiple: true
+          name: goose-windows-squirrel-${{ needs.build-windows.outputs.version || github.event.inputs.version || github.ref_name }}
+          path: squirrel
+        continue-on-error: true
+
+      - name: Download ZIP artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: goose-windows-zip-${{ needs.build-windows.outputs.version || github.event.inputs.version || github.ref_name }}
+          path: zip
+        continue-on-error: true
 
       - name: Get version
         id: version
@@ -124,6 +128,11 @@ jobs:
           else
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
+
+      - name: List downloaded files
+        run: |
+          echo "=== Downloaded files ==="
+          find . -type f -name "*.exe" -o -name "*.zip" -o -name "*.nupkg" -o -name "RELEASES" | head -50
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -135,23 +144,32 @@ jobs:
 
             Windows-optimized build of [Goose](https://github.com/block/goose).
 
-            ### Installation
+            ### Installation (Recommended)
 
-            1. Download `Goose-win32-x64-${{ steps.version.outputs.version }}.zip`
-            2. Extract to a folder of your choice
-            3. Run `Goose.exe`
+            Download and run **`GooseSetup.exe`** - this will install Goose and enable automatic updates.
 
-            ### Changes
+            ### Alternative: Portable Installation
 
-            See the [upstream changelog](https://github.com/block/goose/releases) for full details.
+            Download the ZIP file, extract it, and run `Goose.exe`.
 
-            This release includes Windows-specific enhancements:
+            ### Features
+
             - Native Windows 11 title bar
-            - Windows build optimizations
+            - One-click automatic updates
             - Claude CLI provider fixes for Windows
+            - Automatic sync with upstream block/goose
+
+            ### Updating
+
+            Updates are automatic! When a new version is available:
+            1. Go to **Settings** → **App** tab
+            2. Click **Check for Updates**
+            3. Click **Install & Restart**
           files: |
-            *.zip
-            *.exe
+            squirrel/*.exe
+            squirrel/*.nupkg
+            squirrel/RELEASES
+            zip/*.zip
           draft: false
           prerelease: false
         env:
