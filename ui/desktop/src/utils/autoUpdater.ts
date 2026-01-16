@@ -279,12 +279,17 @@ export function registerUpdateIpcHandlers() {
           throw new Error('Update file not found. Please download the update first.');
         }
 
-        // Improved dialog with clearer instructions
+        // Platform-specific dialog with clearer instructions
+        const isWindows = process.platform === 'win32';
+        const dialogDetail = isWindows
+          ? `The update has been downloaded. To complete the installation:\n\n1. Click "Open Folder & Quit" to view the downloaded update\n2. Extract the ZIP file\n3. Replace your current Goose folder with the extracted files\n4. Launch Goose.exe\n\nThe update will be available the next time you launch Goose.`
+          : `The update has been downloaded and extracted. To complete the installation:\n\n1. Click "Open Folder" to view the new Goose.app\n2. Quit Goose (this app will close)\n3. Drag the new Goose.app to your Applications folder\n4. Replace the existing app when prompted\n\nThe update will be available the next time you launch Goose.`;
+
         const dialogResult = (await dialog.showMessageBox({
           type: 'info',
           title: 'Update Ready to Install',
           message: `Version ${githubUpdateInfo.latestVersion} is ready to install.`,
-          detail: `The update has been downloaded and extracted. To complete the installation:\n\n1. Click "Open Folder" to view the new Goose.app\n2. Quit Goose (this app will close)\n3. Drag the new Goose.app to your Applications folder\n4. Replace the existing app when prompted\n\nThe update will be available the next time you launch Goose.`,
+          detail: dialogDetail,
           buttons: ['Open Folder & Quit', 'Open Folder Only', 'Cancel'],
           defaultId: 0,
           cancelId: 2,
