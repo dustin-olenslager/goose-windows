@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
+use crate::subprocess::configure_command_no_window;
+
 /// Represents errors that can occur during Azure authentication.
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
@@ -127,13 +129,15 @@ impl AzureAuth {
         }
 
         // Get new token using Azure CLI credential
-        let output = tokio::process::Command::new("az")
-            .args([
-                "account",
-                "get-access-token",
-                "--resource",
-                "https://cognitiveservices.azure.com",
-            ])
+        let mut cmd = tokio::process::Command::new("az");
+        cmd.args([
+            "account",
+            "get-access-token",
+            "--resource",
+            "https://cognitiveservices.azure.com",
+        ]);
+        configure_command_no_window(&mut cmd);
+        let output = cmd
             .output()
             .await
             .map_err(|e| AuthError::TokenExchange(format!("Failed to execute Azure CLI: {}", e)))?;

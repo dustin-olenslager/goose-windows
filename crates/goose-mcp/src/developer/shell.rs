@@ -4,6 +4,10 @@ use std::{env, ffi::OsString, process::Stdio};
 #[allow(unused_imports)] // False positive: trait is used for process_group method
 use std::os::unix::process::CommandExt;
 
+#[cfg(windows)]
+#[allow(unused_imports)] // Trait provides creation_flags method for tokio::process::Command
+use std::os::windows::process::CommandExt;
+
 #[derive(Debug, Clone)]
 pub struct ShellConfig {
     pub executable: String,
@@ -102,10 +106,14 @@ pub fn normalize_line_endings(text: &str) -> String {
     }
 }
 
+/// Windows constant for creating processes without a console window
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// Configure a shell command with process group support for proper child process tracking.
 ///
 /// On Unix systems, creates a new process group so child processes can be killed together.
-/// On Windows, the default behavior already supports process tree termination.
+/// On Windows, hides the console window to prevent terminal windows from appearing.
 pub fn configure_shell_command(
     shell_config: &ShellConfig,
     command: &str,
@@ -136,6 +144,12 @@ pub fn configure_shell_command(
     #[cfg(unix)]
     {
         command_builder.process_group(0);
+    }
+
+    // On Windows, hide the console window to prevent terminal windows from appearing
+    #[cfg(windows)]
+    {
+        command_builder.creation_flags(CREATE_NO_WINDOW);
     }
 
     command_builder
@@ -170,8 +184,10 @@ pub async fn kill_process_group(
     {
         if let Some(pid) = pid {
             // Use taskkill to kill the process tree on Windows
+            // Hide the console window to prevent terminal windows from appearing
             let _kill_result = tokio::process::Command::new("taskkill")
                 .args(&["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
                 .await;
         }

@@ -12,6 +12,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use uuid::Uuid;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 const POSTHOG_API_KEY: &str = "phc_RyX5CaY01VtZJCQyhSR5KFh6qimUy81YwxsEpotAftT";
 
 /// Config key for telemetry opt-out preference
@@ -141,6 +147,7 @@ fn get_platform_version() -> Option<String> {
     {
         std::process::Command::new("cmd")
             .args(["/C", "ver"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
