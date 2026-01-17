@@ -1,6 +1,9 @@
 use super::SystemAutomation;
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub struct WindowsAutomation;
 
@@ -12,6 +15,7 @@ impl SystemAutomation for WindowsAutomation {
             .arg("-Command")
             .arg(script)
             .env("GOOSE_TERMINAL", "1")
+            .creation_flags(CREATE_NO_WINDOW)
             .output()?;
 
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())

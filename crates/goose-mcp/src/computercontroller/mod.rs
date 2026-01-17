@@ -19,6 +19,13 @@ use tokio::process::Command;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(windows)]
+#[allow(unused_imports)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 mod docx_tool;
 mod pdf_tool;
 mod xlsx_tool;
@@ -703,13 +710,15 @@ impl ComputerControllerServer {
         let output = match language {
             ScriptLanguage::Powershell => {
                 // For PowerShell, we need to use -File instead of -Command
-                Command::new("powershell")
-                    .arg("-NoProfile")
+                let mut cmd = Command::new("powershell");
+                cmd.arg("-NoProfile")
                     .arg("-NonInteractive")
                     .arg("-File")
                     .arg(&command)
-                    .env("GOOSE_TERMINAL", "1")
-                    .output()
+                    .env("GOOSE_TERMINAL", "1");
+                #[cfg(windows)]
+                cmd.creation_flags(CREATE_NO_WINDOW);
+                cmd.output()
                     .await
                     .map_err(|e| {
                         ErrorData::new(
@@ -719,19 +728,23 @@ impl ComputerControllerServer {
                         )
                     })?
             }
-            _ => Command::new(shell)
-                .arg(shell_arg)
-                .arg(&command)
-                .env("GOOSE_TERMINAL", "1")
-                .output()
-                .await
-                .map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        format!("Failed to run script: {}", e),
-                        None,
-                    )
-                })?,
+            _ => {
+                let mut cmd = Command::new(shell);
+                cmd.arg(shell_arg)
+                    .arg(&command)
+                    .env("GOOSE_TERMINAL", "1");
+                #[cfg(windows)]
+                cmd.creation_flags(CREATE_NO_WINDOW);
+                cmd.output()
+                    .await
+                    .map_err(|e| {
+                        ErrorData::new(
+                            ErrorCode::INTERNAL_ERROR,
+                            format!("Failed to run script: {}", e),
+                            None,
+                        )
+                    })?
+            }
         };
 
         let output_str = String::from_utf8_lossy(&output.stdout).into_owned();
