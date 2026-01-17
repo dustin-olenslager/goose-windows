@@ -46,8 +46,9 @@ impl CursorAgentProvider {
 
     /// Get authentication status from cursor-agent
     async fn get_authentication_status(&self) -> bool {
-        Command::new(&self.command)
-            .arg("status")
+        let mut cmd = Command::new(&self.command);
+        configure_command_no_window(&mut cmd);
+        cmd.arg("status")
             .output()
             .await
             .ok()

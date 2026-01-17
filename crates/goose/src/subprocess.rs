@@ -1,6 +1,10 @@
 use tokio::process::Command;
 
 #[cfg(windows)]
+#[allow(unused_imports)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
 const CREATE_NO_WINDOW_FLAG: u32 = 0x08000000;
 
 #[allow(unused_variables)]
