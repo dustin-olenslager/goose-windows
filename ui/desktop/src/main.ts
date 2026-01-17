@@ -1362,7 +1362,7 @@ ipcMain.handle('open-notifications-settings', async () => {
       return true;
     } else if (process.platform === 'win32') {
       // Windows: Open notification settings in Settings app
-      spawn('ms-settings:notifications', { shell: true });
+      spawn('ms-settings:notifications', { shell: true, windowsHide: true });
       return true;
     } else if (process.platform === 'linux') {
       // Linux: Try different desktop environments
@@ -2445,7 +2445,7 @@ async function appMain() {
         spawn('open', ['-a', 'Google Chrome', url]);
       } else if (process.platform === 'win32') {
         // On Windows, start is built-in command of cmd.exe
-        spawn('cmd.exe', ['/c', 'start', '', 'chrome', url]);
+        spawn('cmd.exe', ['/c', 'start', '', 'chrome', url], { windowsHide: true });
       } else {
         // On Linux, use xdg-open with chrome
         spawn('xdg-open', [url]);

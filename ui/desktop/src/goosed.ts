@@ -198,7 +198,7 @@ export const startGoosed = async (options: StartGoosedOptions): Promise<GoosedRe
     try {
       if (isWindows) {
         const pid = goosedProcess.pid?.toString() || '0';
-        spawn('taskkill', ['/pid', pid, '/T', '/F'], { shell: false });
+        spawn('taskkill', ['/pid', pid, '/T', '/F'], { shell: false, windowsHide: true });
       } else {
         goosedProcess.kill?.();
       }
