@@ -3018,6 +3018,7 @@ dependencies = [
  "opentelemetry_sdk",
  "paste",
  "posthog-rs",
+ "process-wrap",
  "rand 0.8.5",
  "regex",
  "reqwest 0.12.28",
@@ -3053,6 +3054,7 @@ dependencies = [
  "webbrowser",
  "which 8.0.0",
  "winapi",
+ "windows 0.61.3",
  "wiremock",
  "zip 0.6.6",
 ]

@@ -11,6 +11,10 @@ use rmcp::transport::streamable_http_client::{
 use rmcp::transport::{
     ConfigureCommandExt, DynamicTransportError, StreamableHttpClientTransport, TokioChildProcess,
 };
+#[cfg(windows)]
+use process_wrap::tokio::{CommandWrap, CreationFlags};
+#[cfg(windows)]
+use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -38,6 +42,7 @@ use crate::config::search_path::SearchPaths;
 use crate::config::{get_all_extensions, Config};
 use crate::oauth::oauth_flow;
 use crate::prompt_template;
+#[cfg(not(windows))]
 use crate::subprocess::configure_command_no_window;
 use rmcp::model::{
     CallToolRequestParam, Content, ErrorCode, ErrorData, GetPromptResult, Prompt, Resource,
@@ -218,6 +223,11 @@ async fn child_process_client(
 ) -> ExtensionResult<McpClient> {
     #[cfg(unix)]
     command.process_group(0);
+    // Note: On Windows, we use process-wrap's CreationFlags wrapper instead of
+    // calling creation_flags() directly on the Command, because the rmcp crate's
+    // TokioChildProcess internally uses process-wrap which doesn't preserve
+    // creation_flags set directly on the Command.
+    #[cfg(not(windows))]
     configure_command_no_window(&mut command);
 
     if let Ok(path) = SearchPaths::builder().path() {
@@ -245,6 +255,20 @@ async fn child_process_client(
         tracing::info!("No working directory specified, using default");
     }
 
+    // On Windows, wrap the command with CreationFlags to hide the console window.
+    // This is necessary because process-wrap (used by rmcp) doesn't preserve
+    // creation_flags set directly on the Command.
+    #[cfg(windows)]
+    let (transport, mut stderr) = {
+        const CREATE_NO_WINDOW: PROCESS_CREATION_FLAGS = PROCESS_CREATION_FLAGS(0x08000000);
+        let mut wrapped = CommandWrap::from(command);
+        wrapped.wrap(CreationFlags(CREATE_NO_WINDOW));
+        TokioChildProcess::builder(wrapped)
+            .stderr(Stdio::piped())
+            .spawn()?
+    };
+
+    #[cfg(not(windows))]
     let (transport, mut stderr) = TokioChildProcess::builder(command)
         .stderr(Stdio::piped())
         .spawn()?;

@@ -115,6 +115,8 @@ unbinder = "0.1.7"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["wincred"] }
+process-wrap = { version = "9.0.0", features = ["tokio1", "creation-flags"] }
+windows = { version = "0.61", features = ["Win32_System_Threading"] }
 
 [dev-dependencies]
 agent-client-protocol-schema = "0.10.5"

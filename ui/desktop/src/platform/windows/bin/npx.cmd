@@ -5,12 +5,12 @@ SET "SCRIPT_DIR=%~dp0"
 
 REM Try to find Node.js in standard locations first
 if exist "C:\Program Files\nodejs\npx.cmd" (
-    "C:\Program Files\nodejs\npx.cmd" %*
+    CALL "C:\Program Files\nodejs\npx.cmd" %*
     exit /b %errorlevel%
 )
 
 if exist "C:\Program Files (x86)\nodejs\npx.cmd" (
-    "C:\Program Files (x86)\nodejs\npx.cmd" %*
+    CALL "C:\Program Files (x86)\nodejs\npx.cmd" %*
     exit /b %errorlevel%
 )
 
@@ -23,7 +23,7 @@ if errorlevel 1 (
 
 REM Try using the newly installed Node.js
 if exist "C:\Program Files\nodejs\npx.cmd" (
-    "C:\Program Files\nodejs\npx.cmd" %*
+    CALL "C:\Program Files\nodejs\npx.cmd" %*
     exit /b %errorlevel%
 )
 

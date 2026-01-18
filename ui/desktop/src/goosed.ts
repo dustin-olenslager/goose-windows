@@ -142,7 +142,9 @@ export const startGoosed = async (options: StartGoosedOptions): Promise<GoosedRe
     env: processEnv,
     stdio: ['ignore', 'pipe', 'pipe'] as ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
-    detached: isWindows,
+    // Note: detached: true on Windows conflicts with windowsHide: true (Node.js bug #21825)
+    // We don't need detached anyway since we explicitly kill the process on app quit
+    detached: false,
     shell: false,
   };
 
@@ -165,10 +167,6 @@ export const startGoosed = async (options: StartGoosedOptions): Promise<GoosedRe
   const safeArgs = ['agent'];
 
   const goosedProcess: ChildProcess = spawn(goosedPath, safeArgs, spawnOptions);
-
-  if (isWindows && goosedProcess.unref) {
-    goosedProcess.unref();
-  }
 
   goosedProcess.stdout?.on('data', (data: Buffer) => {
     log.info(`goosed stdout for port ${port} and dir ${dir}: ${data.toString()}`);
